@@ -1,0 +1,343 @@
+---
+title: "TP2 Fouilles de données"
+author: "Fabien HOS - Yasmine Darwish"
+date: '2023-04-11'
+output: 
+  html_document:
+    theme : cerulean
+    toc: true 
+    toc_float : true
+    toc_depth: 3  # upto three depths of headings (specified by #, ## and ###)
+    number_sections: true  ## if you want number sections at each table header
+    highlight: haddock  # specifies the syntax highlighting style
+
+---
+
+# Importation des données 
+```{r echo=FALSE}
+library("cluster.datasets")
+data(all.mammals.milk.1956)
+df = all.mammals.milk.1956
+df_without_water = df[,-2]
+head(df)
+```
+
+Ce jeu de données est composé de 25 lignes et de 6 colonnes. 
+Chaque ligne représente une espèce de mammifère et la composition de son lait.
+Les données sont exprimées en pourcentage, nous pouvons le vérifier facilement car chaque somme de ligne correspond à 100. 
+
+
+# Stats descriptives 
+ 
+Nous allons commencer par analyser nos données en regardant les statistiques de chaque variable.
+
+```{r}
+par(mfrow = c(1, 2))
+
+#Boxplot df avec eau
+box1 <- boxplot(df[,-1]) 
+title("Avec WATER")
+
+#Boxplot df sans eau
+box2 <- boxplot(df_without_water[,-1])
+title("Sans WATER")
+
+summary(df)
+```
+
+## Analyses de la composition du lait 
+### Water
+On remarque le lait est très majoritairement composé d'eau, peu importe l'espèce de mammifère observé, le lait est toujours composé d'au moins 44.9% d'eau et peut atteindre les 90.4%.
+
+Pour notre analyse, nous allons constituer deux jeux de données. Nous allons conserver la variable "water" dans l'un et nous allons la retirer dans l'autre. 
+
+### Fat
+Le gras est la deuxième composante du lait. Ce dernier peut atteindre jusqu'à plus de 40% de la composition du lait dans le cas de certaine espèce. On remarque également que le boxplot s'étend beaucoup au dessus de la médiane, laissant penser qu'il existe des espèces avec plusieurs taux de gras dans leur lait. 
+
+### Lactose
+On remarque également que le lactose est une part importante de la composition, ce dernier peut être égal à 0 (chez le phoque) et atteindre 6.9%.
+
+### Protein 
+D'après le boxplot, on observe que le nombre d'espèces ayant un pourcentage de protéine supérieur à la moyenne est égal au nombre d'espèces ayant un pourcentage de protéine inférieur à la moyenne. Il se pourrait qu'il existe au moins deux catégories, ceux avec une forte concentration en protéine et ceux avec une faible concentration.  
+
+### Ash
+Les minéraux sont les éléments les moins bien représentés dans le graphique, on observe tout de même une valeur extrême chez au moins une espèce avec un pourcentage égal à 2.30%. 
+
+
+# ACP 
+
+L'analyse en composantes principales (ACP) est une méthode statistique multivariée qui permet de réduire la dimensionnalité d'un ensemble de données en identifiant les variables les plus importantes et en les transformant en un nouveau système de coordonnées appelé "composantes principales". Cette technique est utilisée pour explorer et visualiser la structure des données, ainsi que pour détecter des relations entre les variables et des groupes de données similaires.
+
+Nous allons l'utiliser pour essayer de projeter dans un repère constitué de deux axes nos 5 variables composantes du lait. 
+
+## ACP avec la variable "water"
+
+```{r}
+library(FactoMineR) # Charger le package "factominer"
+
+#récupérer les noms des animaux dans l'index
+rownames <- df[,1]
+df <- df[,-1]
+rownames(df) <- rownames
+
+
+# Effectuer l'ACP
+resultats_acp <- PCA(df, scale.unit = T, ncp = 2, graph = TRUE)
+
+# Afficher les résultats
+summary(resultats_acp)
+plot.PCA(resultats_acp)
+
+```
+```{r}
+resultats_acp$var$contrib
+```
+
+En lisant les graphiques, nous pouvons voir que les variables contribuant à l'axe 1 sont les variables : water, protein, fat et lactose. 
+Les variables protein et fat sont corrélées positivement sur l'axe 1 tandis que les variables lactosse et water sont corrélées négativement sur l'axe 1. Les variables prises 2 à 2 s'opposent. 
+
+
+## Interprétation des individus sur les axes de l'ACP 
+Les individus à gauche du graph sont des mammifères avec un lait peu protéiné, peu gras mais avec de fortes valeurs pour le lactose et l'eau. 
+
+Les individus 
+
+Remarque : <i> La proportion de variance expliquée par l'ACP est de 76.18% + 18.72% c'est à dire 94.9%. Nous avons donc conservé une excellente partie de l'information </i>
+
+
+## ACP sans la variable "water"
+
+```{r}
+#récupérer les noms des animaux dans l'index
+rownames <- df_without_water[,1]
+df_without_water <- df_without_water[,-1]
+rownames(df_without_water) <- rownames
+
+
+# Effectuer l'ACP
+resultats_acp_without_water <- PCA(df_without_water, scale.unit = T, ncp = 2, graph = TRUE)
+
+# Afficher les résultats
+summary(resultats_acp_without_water)
+plot.PCA(resultats_acp_without_water)
+
+```
+
+## Interprétation de l'ACP sans la variable WATER
+
+Nous avons perdu 2% d'informations sur l'axe 1 en retirant la variable "water" et nous avons gagné 2% sur l'axe 2. Ainsi, en retirant la variable WATER nous avons permis à la variable "ash" représentant les minéraux d'être mieux représentée. 
+Cependant nous ne distinguons pas de différence entre les 2 ACP. Nous garderons la variable "water" pour la suite des analyses. 
+
+
+
+# Classification ascendante hiérachique 
+
+La classification ascendante hiérarchique (CAH) est une méthode d'analyse de données qui permet de regrouper des individus ou des variables similaires en utilisant une approche descendante et hiérarchique. La CAH commence par considérer chaque individu ou chaque variable comme un groupe unique, puis elle combine progressivement ces groupes en fonction de leur similitude jusqu'à obtenir un arbre de classification complet.<br> Cette technique est utilisée pour explorer la structure des données, détecter des groupes homogènes et déterminer des relations entre les individus ou les variables. Il est donc intéressant de l'utiliser dans le cas de données car nous cherchons à regrouper les espèces en fonction des similitudes dans leur lait. 
+
+```{r}
+
+# Effectuer la CAH
+arbre <- hclust(dist(resultats_acp$ind$coord), method = "ward.D2")
+
+#Représentation des sauts de l'inertie 
+inertie <- sort(arbre$height, decreasing = TRUE)
+
+
+
+
+```
+
+## Représenter les sauts d'inertie du dendrogramme 
+```{r}
+plot(inertie, type = "s", xlab = "Nombre de classes", ylab = "Inertie")
+```
+
+Nous pouvons entourer les différents "sauts" d'inertie notables qui se manifestent sous la forme "grandes marches" dans le graphique. 
+
+```{r}
+
+plot(inertie, type = "s", xlab = "Nombre de classes", ylab = "Inertie")
+points(c(2, 3, 4,8,11), inertie[c(2, 3, 4,8,11)], col = c("green3", "red3","blue","cyan","grey"), cex = 2, lwd = 3)
+
+
+```
+
+Ces sauts représentent les nombres de classes potentielles que nous pourrions utiliser pour notre classification. 
+Le but étant de maximiser l'inertie inter-classe et minimiser l'inertie intra-classe. 
+Autrement dit, qui se ressemble, s'assemble. 
+
+
+## Découpage de l'arbre 
+
+Nous savons donc désormais que l'arbre pourrait être découpé en 2,3,4,8 ou 11 classes. Nous allons tous les représenter pour voir à quoi ressemblerait nos classes.
+
+```{r}
+
+classes <- c(2,3,4,8,11)
+
+for (i in classes) {
+  # Partition en i classes
+  groupes.cah <- cutree(arbre, k = i)
+  
+  # Tracé du dendrogramme
+  plot(arbre, main = paste("Partition en", i, "classes"), 
+       xlab = "", ylab = "", sub = "", axes = FALSE, hang = -1)
+  rect.hclust(arbre, k = i, border = "blue")
+  
+}
+```
+
+
+
+
+
+
+# Silhouette 
+
+La silhouette est une méthode d'évaluation de la qualité de la classification des individus dans un ensemble de données, utilisée notamment en analyse de clusters. Elle mesure à quel point chaque individu est bien classé par rapport aux autres individus de son groupe, en prenant en compte la distance entre les individus et leur centre de gravité.<br> Plus la silhouette est proche de 1, plus l'individu est bien classé, tandis qu'une silhouette proche de 0 indique que l'individu pourrait être assigné à un autre groupe. La silhouette est une mesure couramment utilisée pour déterminer le nombre optimal de clusters dans un ensemble de données. Nous allons donc pouvoir quantifier la véracité de nos clusters. 
+
+```{r}
+library(cluster)
+library(factoextra)
+# Boucle pour calculer la silhouette pour chaque nombre de classes
+for (i in classes) {
+  # Partition en i classes
+  groupes.cah <- cutree(arbre, k = i)
+  
+  # Calcul de la silhouette
+  silhouette <- silhouette(groupes.cah, dist(resultats_acp$ind$coord))
+  
+  # Affichage des résultats
+  #print(paste("Silhouette pour", i, "classes :"))
+  #print(silhouette)
+  
+  # Tracé de la silhouette
+  print(fviz_silhouette(silhouette))
+}
+```
+
+
+
+# K-MEANS 
+
+K-means est une méthode de classification non supervisée largement utilisée en statistique et en apprentissage automatique. Elle est utilisée pour diviser un ensemble de données en K clusters (groupes) différents, où chaque point de données appartient à un cluster avec une similarité maximale avec les autres points du même cluster.
+
+La méthode K-means fonctionne de la manière suivante : elle commence par choisir aléatoirement K centres de cluster (centroïdes) parmi les données. Ensuite, elle attribue chaque point de données au centroïde le plus proche. Après cela, elle calcule la moyenne de chaque cluster pour trouver le nouveau centroïde. Ce processus est répété jusqu'à ce que les centroïdes ne changent plus ou que le nombre d'itérations maximum soit atteint.
+
+Le résultat final est une partition des données en K clusters différents, chacun caractérisé par son centroïde.
+
+```{r}
+nb_clusters <- 4 
+
+# Application du k-means
+resultat_kmeans <- kmeans(resultats_acp$ind$coord, centers = nb_clusters)
+
+# Visualisation des résultats du clustering
+plot(resultats_acp$ind$coord, col = resultat_kmeans$cluster, main = "K-means avec 4 clusters")
+points(resultat_kmeans$centers, col = 1:nb_clusters, pch = 8, cex = 2)
+
+resultat_kmeans$cluster
+
+```
+## Détermination du nombre de classes pour K-Means via la méthode du coude 
+
+```{r}
+# Sélection des variables à utiliser pour le clustering
+vars <- c("lactose", "protein", "fat", "water", "ash")
+
+# Calcul du graphique du coude pour les clusters de 1 à 10
+set.seed(123)
+kmax <- 15
+sse <- numeric(kmax)
+for(k in 1:kmax) {
+  km.out <- kmeans(resultats_acp$ind$coord, centers = k, nstart = 25)  #acp ou dataframe ? 
+  sse[k] <- km.out$tot.withinss
+}
+
+# Affichage du graphique du coude
+ggplot(data.frame(k = 1:kmax, SSE = sse), aes(x = k, y = SSE)) +
+  geom_point() +
+  geom_line() +
+  labs(title = "Graphique du coude", x = "Nombre de clusters", y = "Variance expliquée")
+
+```
+
+## Statistiques descriptives des classes obtenues via la K-means 
+```{r}
+# Comptage du nombre d'observations dans chaque classe
+table(resultat_kmeans$cluster)
+
+# Sélection des variables à utiliser pour le clustering
+variables <- c("fat", "water", "lactose","ash","protein")
+
+# Graphique des histogrammes pour chaque variable en distinguant les classes par des couleurs différentes
+par(mfrow=c(4,1))
+for (i in 1:length(variables)) {
+  hist(df[, variables[i]][resultat_kmeans$cluster == 1], main=paste("Cluster 1 - ", variables[i]), col="blue")
+  hist(df[, variables[i]][resultat_kmeans$cluster == 2], main=paste("Cluster 2 - ", variables[i]), col="green")
+  hist(df[, variables[i]][resultat_kmeans$cluster == 3], main=paste("Cluster 3 - ", variables[i]), col="red")
+  hist(df[, variables[i]][resultat_kmeans$cluster == 4], main=paste("Cluster 4 - ", variables[i]), col="orange")
+}
+
+# Statistiques descriptives pour chaque classe
+for (i in 1:max(resultat_kmeans$cluster)) {
+  print(paste("Cluster", i))
+  print(summary(df[resultat_kmeans$cluster == i, variables]))
+}
+
+# Test d'ANOVA pour comparer les moyennes des variables entre les différentes classes
+#for (i in 1:length(variables)) {
+ # print(paste("Variable", variables[i]))
+  #print(summary(aov(df[, variables[i]] ~ resultat_kmeans$cluster)))
+#}
+```
+
+
+
+# Rphylopic 
+
+Nous avons consulté la documentation, il semblerait que pour utiliser le package, nous ayons besoin du nom scientifique de l'animal, ce qui n'est pas notre cas dans notre jeu de données. De plus, il ne semble pas possible d'intégrer plusieurs "phylopic" dans un graphique (celui de la classification kmeans). 
+
+
+# Seriation 
+
+Le package R "seriation" est une collection de fonctions qui permettent de réaliser des analyses de sériation. La sériation est une méthode d'analyse de données qui consiste à ordonner des objets selon leur similarité, afin de révéler des structures et des tendances dans les données. 
+
+```{r}
+library(seriation)
+
+df_2 <- all.mammals.milk.1956
+df_2 <- df_2[,-1]
+
+# Réorganiser les objets au hasard
+set.seed(123)
+df_2 <- df_2[sample(seq_len(nrow(df_2))),]
+
+# Calculer la matrice de dissimilarité
+dist_result <- dist(df_2)
+
+# Sérier les objets, réorganiser les lignes en fonction de leur similarité
+object_order <- seriate(dist_result)
+
+# Visualiser l'effet de la sériation sur la matrice de dissimilarité
+pimage(dist_result, main = "Random order")
+
+pimage(dist_result, order = object_order, main = "Reordered")
+
+
+```
+
+## Visualisation sous la forme d'heatmap 
+```{r}
+# Heatmap des données brutes
+pimage(scale(df_2), main = "Random")
+
+# Heatmap des données réorganisées
+pimage(scale(df_2), order = c(object_order, NA), main = "Reordered")
+```
+
+En regardant la heatmap "Reordered" nous voyons que chaque observation a été classé en fonction des des valeurs pour chaque variable. 
+On retrouve les mêmes observations que dans l'ACP, c'est à dire que les espèces avec de fortes valeurs pour le lactose et l'eau possèdent de faibles valeurs pour les minéraux, le gras et les protéines et réciproquement. 
+
+
+
