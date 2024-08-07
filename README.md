@@ -1,4 +1,4 @@
-# Classification du lait des mammifères 
+# Classification du lait des mammifères 🐄🥛
 
 Ce notebook en R présente une mise en pratique des concepts de l'ACP et de la classification non-supervisée (<i>Clustering</i>).
 
